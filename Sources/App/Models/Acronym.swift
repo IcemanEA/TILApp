@@ -21,12 +21,16 @@ final class Acronym: Model {
     @Field(key: "long")
     var long: String // если поле может быть и нулл - то надо опциональный тип свойства и проперти врапер @OptionalField
     
+    @Parent(key: "userID") // ключ для связи с другой таблицей
+    var user: User
+    
     init () {} // обязательный пустой инициализатор!
 
-    init(id: UUID? = nil, short: String, long: String) {
+    init(id: UUID? = nil, short: String, long: String, userID: User.IDValue) {
         self.id = id
         self.short = short
         self.long = long
+        self.$user.id = userID  // делаем связь по ID
     }
 
 }

@@ -22,6 +22,7 @@ struct AcronymController: RouteCollection {
         acronymRoutes.get("search", use: searchHandler)
         acronymRoutes.get("first", use: getFirstHandler)
         
+        acronymRoutes.get(":acronymID", "user", use: getUserHandler)
     }
     // показать все
     func getAllHandler(_ req: Request) -> EventLoopFuture<[Acronym]> {
@@ -36,22 +37,30 @@ struct AcronymController: RouteCollection {
     
     // создать новый
     func createHandler(_ req: Request) throws -> EventLoopFuture<Acronym> {
-        let acronym = try req.content.decode(Acronym.self)
+        // получем данные, которые соответствуют промежуточной структуре для добавления
+        let data = try req.content.decode(CreateAcronymData.self)
+        
+        let acronym = Acronym(
+            short: data.short,
+            long: data.long,
+            userID: data.userID)
         return acronym.save(on: req.db).map { acronym }
     }
     
     // обновить выбранный
     func updateHandler(_ req: Request) throws -> EventLoopFuture<Acronym> {
-        // полученный параметр из тела
-        let updatedAcronym = try req.content.decode(Acronym.self)
-        return Acronym.find(
-            req.parameters.get("acronymID"),
-            on: req.db)
-        .unwrap(or: Abort(.notFound)).flatMap { acronym in // тут флэт как вложенность будущих вещей из поиска и внутри апдейта
-            acronym.short = updatedAcronym.short
-            acronym.long = updatedAcronym.long
-            return acronym.save(on: req.db).map { acronym } // тут сохраняем
-        }
+        // полученный параметр из тела - можно удобную структуру для обновления
+        let updatedData = try req.content.decode(CreateAcronymData.self)
+                
+        return Acronym
+            .find(req.parameters.get("acronymID"), on: req.db)
+            .unwrap(or: Abort(.notFound))
+            .flatMap { acronym in // тут флэт как вложенность будущих вещей из поиска и внутри апдейта
+                acronym.short = updatedData.short
+                acronym.long = updatedData.long
+                acronym.$user.id = updatedData.userID // можем обновить в том числе и юзера!
+                return acronym.save(on: req.db).map { acronym } // тут сохраняем
+            }
     }
     
     // удалить выбранный
@@ -90,4 +99,20 @@ struct AcronymController: RouteCollection {
             .unwrap(or: Abort(.notFound))
     }
     
+    // поиск по родителю
+    func getUserHandler(_ req: Request) -> EventLoopFuture<User> {
+        Acronym.find(req.parameters.get("acronymID"), on: req.db)
+            .unwrap(or: Abort(.notFound))
+            .flatMap { acronym in
+                acronym.$user.get(on: req.db) // получаeм юзера из актронимАйди
+            }
+    }
+}
+
+// MARK: - CreateAcronymData
+// структура для добавления данных, минуя сложную систему с вложенностью USER
+struct CreateAcronymData: Content {
+    let short: String
+    let long: String
+    let userID: UUID
 }
