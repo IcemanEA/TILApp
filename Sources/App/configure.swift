@@ -22,8 +22,10 @@ public func configure(_ app: Application) throws {
         database: "vapor_database"
     ), as: .psql)
     
-    app.migrations.add(CreateAcronym())
-    app.logger.logLevel = .debug
+    app.migrations.add(CreateAcronym()) // добавляем таблицу в БД
+    
+    app.logger.logLevel = .debug // включаем дополнительный дебаг 
+    
     try app.autoMigrate().wait()
 
     // register routes
